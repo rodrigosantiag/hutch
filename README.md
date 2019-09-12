@@ -1,0 +1,2 @@
+# hutch
+Helpers for RabbitMQ

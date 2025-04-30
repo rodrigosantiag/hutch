@@ -1,1 +1,5 @@
+Mimic.copy(AMQP.Connection)
+Mimic.copy(AMQP.Channel)
+Mimic.copy(AMQP.Exchange)
+Mimic.copy(AMQP.Queue)
 ExUnit.start()

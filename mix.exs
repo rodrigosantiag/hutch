@@ -21,12 +21,12 @@ defmodule Hutch.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:amqp, "~> 4.0"},
-      {:broadway, "~> 1.2"},
-      {:broadway_rabbitmq, "~> 0.8.2"},
+      {:amqp, "~> 1.3 or ~> 2.0 or ~> 3.0 or ~> 4.0"},
+      {:broadway, "~> 1.0"},
+      {:broadway_rabbitmq, "~> 0.6"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:jason, "~> 1.4"},
-      {:mimic, "~> 1.11", only: :test}
+      {:mimic, "~> 1.0", only: :test}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]

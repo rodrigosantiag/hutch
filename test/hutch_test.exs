@@ -17,7 +17,7 @@ defmodule HutchTest do
     end)
 
     opts = [
-      connection_string: "amqp://localhost",
+      rabbit_url: "amqp://localhost",
       exchange: "myapp",
       prefix: "dev",
       retry: false
@@ -39,7 +39,7 @@ defmodule HutchTest do
     end)
 
     opts = [
-      connection_string: "amqp://localhost",
+      rabbit_url: "amqp://localhost",
       exchange: "myapp",
       prefix: "dev",
       retry: true

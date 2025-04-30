@@ -4,7 +4,7 @@ defmodule Hutch do
 
   @spec create_queue(String.t(), Keyword.t()) :: :ok | {:error, any()}
   def create_queue(queue_name, opts) do
-    connection_string = Keyword.fetch!(opts, :connection_string)
+    connection_string = Keyword.fetch!(opts, :rabbit_url)
 
     with_channel(connection_string, fn channel ->
       create_queue(channel, queue_name, opts)

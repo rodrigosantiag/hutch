@@ -1,15 +1,19 @@
 defmodule Hutch do
-
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       @rabbit_url Keyword.fetch!(opts, :rabbit_url)
+      @prefix Keyword.fetch!(opts, :prefix)
+      # 14 days
+      @hutch_default_dlq_ttl :timer.hours(24) * 14
+      @default_dlq_ttl Keyword.get(opts, :default_dlq_ttl, @hutch_default_dlq_ttl)
 
       def rabbit_url, do: @rabbit_url
+      def prefix, do: @prefix
+      def default_dlq_ttl, do: @default_dlq_ttl
     end
   end
 
   @default_retry_interval :timer.minutes(2)
-  @default_dlq_ttl :timer.hours(24) * 14
 
   @spec create_queue(String.t(), Keyword.t()) :: :ok | {:error, any()}
   def create_queue(queue_name, opts) do
@@ -79,9 +83,9 @@ defmodule Hutch do
     exchange = Keyword.fetch!(opts, :exchange)
     durable = Keyword.get(opts, :durable, true)
     retry = Keyword.get(opts, :retry, false)
-    retry_ttl = Keyword.get(opts, :retry_iterval, @default_retry_interval)
-    ttl = Keyword.get(opts, :ttl, @default_dlq_ttl)
-    prefix = Keyword.get(opts, :prefix, "hutch") <> "."
+    retry_ttl = Keyword.get(opts, :retry_interval, @default_retry_interval)
+    ttl = Keyword.get(opts, :ttl)
+    prefix = Keyword.get(opts, :prefix) <> "."
 
     final_queue_name = prefix <> queue_name
     dead_letter_queue = final_queue_name <> ".dlq"

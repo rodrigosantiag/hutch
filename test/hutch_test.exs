@@ -11,6 +11,7 @@ defmodule HutchTest do
 
     expect(AMQP.Queue, :declare, 2, fn :chan, _queue, _opts -> {:ok, %{}} end)
     expect(AMQP.Exchange, :declare, 2, fn :chan, _exchange, :topic -> :ok end)
+
     expect(AMQP.Queue, :bind, 2, fn :chan, _queue, _exchange, opts ->
       assert Keyword.has_key?(opts, :routing_key)
       :ok
@@ -33,6 +34,7 @@ defmodule HutchTest do
 
     expect(AMQP.Queue, :declare, 3, fn :chan, _queue, _opts -> {:ok, %{}} end)
     expect(AMQP.Exchange, :declare, 3, fn :chan, _exchange, :topic -> :ok end)
+
     expect(AMQP.Queue, :bind, 3, fn :chan, _queue, _exchange, opts ->
       assert Keyword.has_key?(opts, :routing_key)
       :ok

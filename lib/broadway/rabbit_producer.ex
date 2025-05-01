@@ -1,4 +1,4 @@
-defmodule Hutch.Broadway.Producer do
+defmodule Hutch.Broadway.RabbitProducer do
   alias Broadway.Message
 
   require Logger
@@ -7,20 +7,21 @@ defmodule Hutch.Broadway.Producer do
     quote bind_quoted: [opts: opts] do
       require Logger
 
+      @queue_manager Keyword.fetch!(opts, :queue_manager)
       @batchers Keyword.get(opts, :batchers, [])
       @default_retry_interval :timer.minutes(2)
-      @default_dlq_ttl :timer.hours(24) * 14 # 14 days
+      # 14 days
+      @default_dlq_ttl :timer.hours(24) * 14
       @durable Keyword.get(opts, :durable, true)
       @exchange Keyword.fetch!(opts, :exchange)
       @name Keyword.get(opts, :name, __MODULE__)
       @prefetch_count Keyword.get(opts, :prefetch_count, 20)
-      @prefix Keyword.get(opts, :prefix, "hutch")
+      @prefix Keyword.get(opts, :prefix, @queue_manager.prefix())
       @processors Keyword.get(opts, :processors, default: [])
       @retry Keyword.get(opts, :retry, false)
-      @rabbit_url Hutch.rabbit_url()
-      @retry_interval Keyword.get(opts, :retry_interval, @default_ttl_ms)
-      @routing_key Keyword.fetch!(opts, :routing_key)
-      @ttl Keyword.get(opts, :ttl, @default_dlq_ttl)
+      @retry_interval Keyword.get(opts, :retry_interval, @default_retry_interval)
+      @routing_key Keyword.get(opts, :routing_key)
+      @ttl Keyword.get(opts, :ttl, @queue_manager.default_dlq_ttl())
       @worker_count Keyword.get(opts, :worker_count, 2)
 
       use Broadway
@@ -30,7 +31,7 @@ defmodule Hutch.Broadway.Producer do
         producer = [
           module:
             {BroadwayRabbitMQ.Producer,
-             connection: @rabbit_url,
+             connection: @queue_manager.rabbit_url(),
              queue: "#{@prefix}.#{@routing_key}",
              qos: [prefetch_count: @prefetch_count],
              on_failure: :reject},
@@ -41,7 +42,10 @@ defmodule Hutch.Broadway.Producer do
           exchange: @exchange,
           ttl: @ttl,
           durable: @durable,
-          retry: @retry
+          rabbit_url: @queue_manager.rabbit_url(),
+          retry: @retry,
+          retry_interval: @retry_interval,
+          prefix: @prefix
         )
 
         Broadway.start_link(

@@ -1,4 +1,14 @@
 defmodule Hutch do
+
+  defmacro __using__(opts) do
+    quote bind_quoted: [opts: opts] do
+      @rabbit_url Keyword.fetch!(opts, :rabbit_url)
+
+
+      def rabbit_url, do: @rabbit_url
+    end
+  end
+
   @default_retry_interval :timer.minutes(2)
   @default_dlq_ttl :timer.hours(24) * 14
 

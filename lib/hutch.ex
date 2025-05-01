@@ -5,11 +5,14 @@ defmodule Hutch do
       @prefix Keyword.fetch!(opts, :prefix)
       # 14 days
       @hutch_default_dlq_ttl :timer.hours(24) * 14
-      @default_dlq_ttl Keyword.get(opts, :default_dlq_ttl, @hutch_default_dlq_ttl)
+      @hutch_default_attempts 2
+      @default_dlq_ttl Keyword.get(opts, :dlq_ttl, @hutch_default_dlq_ttl)
+      @default_retry_attempts Keyword.get(opts, :retry_attempts, @hutch_default_attempts)
 
       def rabbit_url, do: @rabbit_url
       def prefix, do: @prefix
       def default_dlq_ttl, do: @default_dlq_ttl
+      def default_retry_attempts, do: @default_retry_attempts
     end
   end
 
@@ -28,7 +31,7 @@ defmodule Hutch do
   def create_queue(channel, queue_name, opts) do
     config = build_config(queue_name, opts)
 
-    base_bindings = [
+    bindings = [
       binding(config.exchange, config.final_queue_name, config.queue_name),
       binding(
         config.dead_letter_exchange,
@@ -37,43 +40,18 @@ defmodule Hutch do
       )
     ]
 
-    all_bindings =
-      if config.retry do
-        declare_base_queue(
-          channel,
-          config.retry_exchange,
-          config.final_queue_name,
-          config.retry_routing_key,
-          config.durable
-        )
-
-        declare_retry_queue(
-          channel,
-          config.exchange,
-          config.retry_queue,
-          config.queue_name,
-          config.retry_ttl,
-          config.durable
-        )
-
-        [
-          binding(config.retry_exchange, config.retry_queue, config.retry_routing_key)
-          | base_bindings
-        ]
-      else
-        declare_base_queue(
-          channel,
-          config.dead_letter_exchange,
-          config.final_queue_name,
-          config.dead_letter_routing_key,
-          config.durable
-        )
-
-        base_bindings
-      end
+    declare_base_queue(
+      channel,
+      config.dead_letter_exchange,
+      config.final_queue_name,
+      config.retry_attempts,
+      config.retry_ttl,
+      config.dead_letter_routing_key,
+      config.durable
+    )
 
     declare_expire_queue(channel, config.dead_letter_queue, config.ttl, config.durable)
-    bind_queues(channel, all_bindings)
+    bind_queues(channel, bindings)
   end
 
   defp binding(exchange, queue, routing_key),
@@ -82,7 +60,7 @@ defmodule Hutch do
   defp build_config(queue_name, opts) do
     exchange = Keyword.fetch!(opts, :exchange)
     durable = Keyword.get(opts, :durable, true)
-    retry = Keyword.get(opts, :retry, false)
+    retry_attempts = Keyword.get(opts, :retry_attempts)
     retry_ttl = Keyword.get(opts, :retry_interval, @default_retry_interval)
     ttl = Keyword.get(opts, :ttl)
     prefix = Keyword.get(opts, :prefix) <> "."
@@ -98,7 +76,7 @@ defmodule Hutch do
     %{
       exchange: exchange,
       durable: durable,
-      retry: retry,
+      retry_attempts: retry_attempts,
       retry_ttl: retry_ttl,
       ttl: ttl,
       queue_name: queue_name,
@@ -143,21 +121,23 @@ defmodule Hutch do
     )
   end
 
-  defp declare_retry_queue(channel, exchange, retry_queue, routing_key, retry_ttl, durable) do
-    AMQP.Queue.declare(channel, retry_queue,
-      durable: durable,
-      arguments: [
-        {"x-message-ttl", :signedint, retry_ttl},
-        {"x-dead-letter-exchange", :longstr, exchange},
-        {"x-dead-letter-routing-key", :longstr, routing_key}
-      ]
-    )
-  end
-
-  defp declare_base_queue(channel, exchange, queue_name, routing_key, durable) do
+  defp declare_base_queue(
+         channel,
+         exchange,
+         queue_name,
+         number_attempts,
+         retry_ttl,
+         routing_key,
+         durable
+       ) do
     AMQP.Queue.declare(channel, queue_name,
       durable: durable,
       arguments: [
+        {"x-queue-type", :longstr, "quorum"},
+        {"x-delivery-limit", :signedint, number_attempts},
+        {"x-message-ttl", :signedint, retry_ttl},
+        {"x-dead-letter-strategy", :longstr, "at-least-once"},
+        {"x-overflow", :longstr, "reject-publish"},
         {"x-dead-letter-exchange", :longstr, exchange},
         {"x-dead-letter-routing-key", :longstr, routing_key}
       ]

@@ -26,27 +26,4 @@ defmodule HutchTest do
 
     assert :ok = Hutch.create_queue("myqueue", opts)
   end
-
-  test "creates queue with retry: true" do
-    expect(AMQP.Connection, :open, fn "amqp://localhost" -> {:ok, :conn} end)
-    expect(AMQP.Channel, :open, fn :conn -> {:ok, :chan} end)
-    expect(AMQP.Connection, :close, fn :conn -> :ok end)
-
-    expect(AMQP.Queue, :declare, 3, fn :chan, _queue, _opts -> {:ok, %{}} end)
-    expect(AMQP.Exchange, :declare, 3, fn :chan, _exchange, :topic -> :ok end)
-
-    expect(AMQP.Queue, :bind, 3, fn :chan, _queue, _exchange, opts ->
-      assert Keyword.has_key?(opts, :routing_key)
-      :ok
-    end)
-
-    opts = [
-      rabbit_url: "amqp://localhost",
-      exchange: "myapp",
-      prefix: "dev",
-      retry: true
-    ]
-
-    assert :ok = Hutch.create_queue("myqueue", opts)
-  end
 end

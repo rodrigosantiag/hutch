@@ -18,7 +18,7 @@ defmodule Hutch.Broadway.RabbitProducer do
       @prefetch_count Keyword.get(opts, :prefetch_count, 20)
       @prefix Keyword.get(opts, :prefix, @queue_manager.prefix())
       @processors Keyword.get(opts, :processors, default: [])
-      @retry Keyword.get(opts, :retry, false)
+      @retry_attempts Keyword.get(opts, :retry_attempts, @queue_manager.default_retry_attempts())
       @retry_interval Keyword.get(opts, :retry_interval, @default_retry_interval)
       @routing_key Keyword.get(opts, :routing_key)
       @ttl Keyword.get(opts, :ttl, @queue_manager.default_dlq_ttl())
@@ -34,7 +34,7 @@ defmodule Hutch.Broadway.RabbitProducer do
              connection: @queue_manager.rabbit_url(),
              queue: "#{@prefix}.#{@routing_key}",
              qos: [prefetch_count: @prefetch_count],
-             on_failure: :reject},
+             on_failure: :reject_and_requeue},
           concurrency: @worker_count
         ]
 
@@ -43,7 +43,7 @@ defmodule Hutch.Broadway.RabbitProducer do
           ttl: @ttl,
           durable: @durable,
           rabbit_url: @queue_manager.rabbit_url(),
-          retry: @retry,
+          retry_attempts: @retry_attempts,
           retry_interval: @retry_interval,
           prefix: @prefix
         )
@@ -59,6 +59,14 @@ defmodule Hutch.Broadway.RabbitProducer do
         )
       end
 
+      # @impl true
+      # def handle_message(_processor, message, _context) do
+      #   message
+      #   |> decode_payload()
+      #   |> process_message()
+      #   |> Message.put_batcher(@routing_key)
+      # end
+
       @spec decode_payload(Message.t()) :: Message.t()
       def decode_payload(msg) do
         case Jason.decode(msg.data) do
@@ -72,6 +80,11 @@ defmodule Hutch.Broadway.RabbitProducer do
         end
       end
 
+      # def process_message(msg) do
+      #   msg
+      # end
+
+      # , process_message: 1
       defoverridable decode_payload: 1
 
       defp with_partition_by(args) do

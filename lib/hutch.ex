@@ -4,7 +4,6 @@ defmodule Hutch do
     quote bind_quoted: [opts: opts] do
       @rabbit_url Keyword.fetch!(opts, :rabbit_url)
 
-
       def rabbit_url, do: @rabbit_url
     end
   end

@@ -4,11 +4,7 @@ defmodule Hutch.RetryAcknowledger do
   require Logger
 
   @impl true
-  def configure(original_ack_ref, ack_data, options) do
-    Logger.info("Original ack_ref: #{inspect(original_ack_ref)}")
-    Logger.info("Ack data: #{inspect(ack_data)}")
-    Logger.info("Options: #{inspect(options)}")
-
+  def configure(_original_ack_ref, ack_data, _options) do
     {:ok, ack_data}
   end
 

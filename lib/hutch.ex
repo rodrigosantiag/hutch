@@ -1,6 +1,9 @@
 defmodule Hutch do
+  @moduledoc false
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
+      require Logger
+      # TODO: Queue creation OK. Now, implement retry logic.
       # Required options
       @rabbit_url Keyword.fetch!(opts, :rabbit_url)
       @prefix Keyword.fetch!(opts, :prefix)
@@ -18,7 +21,7 @@ defmodule Hutch do
       @retry Keyword.get(opts, :retry, false)
 
       def rabbit_url, do: @rabbit_url
-      def prefix, do: @prefix <> "."
+      def prefix, do: @prefix
       def dlq_ttl, do: @dlq_ttl
       def retry_attempts, do: @retry_attempts
       def retry_interval, do: @retry_interval
@@ -36,8 +39,8 @@ defmodule Hutch do
         config = build_config(queue_name, opts)
 
         bindings = [
-          binding(config.exchange, config.final_queue_name, config.retry_queue),
-          binding(config.exchange, config.retry_queue, config.queue_name)
+          binding(config.exchange, config.final_queue_name, config.queue_name),
+          binding(config.exchange, config.retry_queue, config.retry_routing_key)
         ]
 
         declare_quorum_base_queue(
@@ -81,10 +84,12 @@ defmodule Hutch do
         do: [exchange: exchange, queue_name: queue, routing_key: routing_key]
 
       defp build_config(queue_name, opts) do
+        Logger.info("Queue name: #{queue_name}")
+        Logger.info("Options: #{inspect(opts)}")
         exchange = Keyword.fetch!(opts, :exchange)
         durable = Keyword.get(opts, :durable, true)
 
-        final_queue_name = prefix() <> queue_name
+        final_queue_name = prefix() <> "." <> queue_name
         rejected_queue = final_queue_name <> ".rejected"
         rejected_exchange = exchange <> ".rejected"
         rejected_routing_key = queue_name <> ".rejected"
@@ -124,6 +129,8 @@ defmodule Hutch do
       end
 
       defp with_channel(fun) do
+        Logger.info("Function: #{inspect(fun)}")
+        Logger.info("RabbitMQ connection: #{rabbit_url()}")
         {:ok, connection} = AMQP.Connection.open(rabbit_url())
         {:ok, channel} = AMQP.Channel.open(connection)
         result = fun.(channel)

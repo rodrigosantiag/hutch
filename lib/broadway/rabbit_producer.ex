@@ -18,10 +18,11 @@ defmodule Hutch.Broadway.RabbitProducer do
       @prefetch_count Keyword.get(opts, :prefetch_count, 20)
       @prefix Keyword.get(opts, :prefix, @queue_manager.prefix())
       @processors Keyword.get(opts, :processors, default: [])
-      @retry_attempts Keyword.get(opts, :retry_attempts, @queue_manager.default_retry_attempts())
+      @retry Keyword.get(opts, :retry, false)
+      @retry_attempts Keyword.get(opts, :retry_attempts, @queue_manager.retry_attempts())
       @retry_interval Keyword.get(opts, :retry_interval, @default_retry_interval)
       @routing_key Keyword.get(opts, :routing_key)
-      @ttl Keyword.get(opts, :ttl, @queue_manager.default_dlq_ttl())
+      @ttl Keyword.get(opts, :ttl, @queue_manager.dlq_ttl())
       @worker_count Keyword.get(opts, :worker_count, 2)
 
       use Broadway
@@ -34,15 +35,19 @@ defmodule Hutch.Broadway.RabbitProducer do
              connection: @queue_manager.rabbit_url(),
              queue: "#{@prefix}.#{@routing_key}",
              qos: [prefetch_count: @prefetch_count],
-             on_failure: :reject_and_requeue},
+             on_failure: :reject,
+             metadata: [
+               :delivery_tag,
+               :headers
+             ]},
           concurrency: @worker_count
         ]
 
-        Hutch.create_queue(@routing_key,
+        @queue_manager.create_queue(@routing_key,
           exchange: @exchange,
           ttl: @ttl,
           durable: @durable,
-          rabbit_url: @queue_manager.rabbit_url(),
+          retry: @retry,
           retry_attempts: @retry_attempts,
           retry_interval: @retry_interval,
           prefix: @prefix
@@ -59,12 +64,43 @@ defmodule Hutch.Broadway.RabbitProducer do
         )
       end
 
-      # @impl true
-      # def handle_message(_processor, message, _context) do
+      if @retry do
+        @impl true
+        def prepare_messages(messages, context) do
+          Logger.info("Context for retry: #{inspect(context)}")
+
+          messages
+          |> Enum.map(fn msg ->
+            Logger.info("Message for retry: #{inspect(msg)}")
+
+            msg
+            |> inject_acknowledger()
+          end)
+        end
+      end
+
+      defp inject_acknowledger(msg) do
+        # Inject the ack_ref and ack_data into the message
+        retry_config = %{
+          retry_attempts: @retry_attempts,
+          queue_name: @routing_key,
+          exchange: @exchange,
+          prefix: @prefix,
+          conn: @queue_manager.rabbit_url()
+        }
+
+        %{
+          msg
+          | acknowledger: {Hutch.RetryAcknowledger, retry_config, msg.acknowledger}
+        }
+      end
+
+      # # @impl true
+      # def handle_failed(processor, message, context) do
+      #   Logger.info("Failed processor: #{inspect(processor)}")
+      #   Logger.info("Failed Message: #{inspect(message)}")
+      #   Logger.info("Failed Context: #{inspect(context)}")
       #   message
-      #   |> decode_payload()
-      #   |> process_message()
-      #   |> Message.put_batcher(@routing_key)
       # end
 
       @spec decode_payload(Message.t()) :: Message.t()

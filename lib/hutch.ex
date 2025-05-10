@@ -174,6 +174,7 @@ defmodule Hutch do
             {"x-queue-type", :longstr, "quorum"},
             {"x-dead-letter-strategy", :longstr, "at-least-once"},
             {"x-dead-letter-exchange", :longstr, ""},
+            {"x-overflow", :longstr, "reject-publish"},
             {"x-dead-letter-routing-key", :longstr, routing_key}
           ]
         )

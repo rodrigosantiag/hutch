@@ -45,15 +45,9 @@ defmodule Hutch.RetryAcknowledger do
 
         ensure_publisher_started(ack_ref.conn)
 
-        # publisher_options = [
-        #   content_type: message.metadata[:content_type],
-        #   content_encoding: message.metadata[:content_encoding],
-        #   headers: add_rejection_headers(headers, attempts_count),
-        #   persistent: true
-        # ]
-
         payload = Jason.encode!(message.data)
 
+        # TODO: refactor this (too nested)
         case Hutch.Publisher.publish(
                "",
                rejected_queue,
@@ -104,8 +98,7 @@ defmodule Hutch.RetryAcknowledger do
       {:table, properties}, acc ->
         case List.keyfind(properties, "reason", 0) do
           {"reason", :longstr, "rejected"} ->
-            # Found a rejection entry, get the count
-            # TODO: refactor this
+            # TODO: refactor this (too nested)
             case List.keyfind(properties, "count", 0) do
               {"count", :long, count} -> acc + count
               _ -> acc
@@ -128,16 +121,5 @@ defmodule Hutch.RetryAcknowledger do
       _pid ->
         :ok
     end
-  end
-
-  defp add_rejection_headers(headers, attempts_count) do
-    rejection_headers = [
-      {"x-rejected", :bool, true},
-      {"x-rejection-timestamp", :timestamp, :os.system_time(:seconds)},
-      {"x-retry-count", :long, attempts_count}
-    ]
-
-    # Combine with existing headers
-    (headers || []) ++ rejection_headers
   end
 end

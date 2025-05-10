@@ -8,10 +8,10 @@ defmodule Hutch.Broadway.RabbitProducer do
       require Logger
 
       @queue_manager Keyword.fetch!(opts, :queue_manager)
+
       @batchers Keyword.get(opts, :batchers, [])
       @default_retry_interval :timer.minutes(2)
-      # 14 days
-      @default_dlq_ttl :timer.hours(24) * 14
+      @dlq_ttl Keyword.get(opts, :dlq_ttl)
       @durable Keyword.get(opts, :durable, true)
       @exchange Keyword.fetch!(opts, :exchange)
       @name Keyword.get(opts, :name, __MODULE__)
@@ -19,10 +19,9 @@ defmodule Hutch.Broadway.RabbitProducer do
       @prefix Keyword.get(opts, :prefix, @queue_manager.prefix())
       @processors Keyword.get(opts, :processors, default: [])
       @retry Keyword.get(opts, :retry, false)
-      @retry_attempts Keyword.get(opts, :retry_attempts, @queue_manager.retry_attempts())
-      @retry_interval Keyword.get(opts, :retry_interval, @default_retry_interval)
-      @routing_key Keyword.get(opts, :routing_key)
-      @ttl Keyword.get(opts, :ttl, @queue_manager.dlq_ttl())
+      @retry_attempts Keyword.get(opts, :retry_attempts)
+      @retry_interval Keyword.get(opts, :retry_interval)
+      @routing_key Keyword.fetch!(opts, :routing_key)
       @worker_count Keyword.get(opts, :worker_count, 2)
 
       use Broadway
@@ -44,8 +43,9 @@ defmodule Hutch.Broadway.RabbitProducer do
         ]
 
         @queue_manager.create_queue(@routing_key,
+          conn: @queue_manager.rabbit_url(),
           exchange: @exchange,
-          ttl: @ttl,
+          dlq_ttl: @dlq_ttl,
           durable: @durable,
           retry: @retry,
           retry_attempts: @retry_attempts,
@@ -95,14 +95,6 @@ defmodule Hutch.Broadway.RabbitProducer do
         }
       end
 
-      # # @impl true
-      # def handle_failed(processor, message, context) do
-      #   Logger.info("Failed processor: #{inspect(processor)}")
-      #   Logger.info("Failed Message: #{inspect(message)}")
-      #   Logger.info("Failed Context: #{inspect(context)}")
-      #   message
-      # end
-
       @spec decode_payload(Message.t()) :: Message.t()
       def decode_payload(msg) do
         case Jason.decode(msg.data) do
@@ -116,11 +108,6 @@ defmodule Hutch.Broadway.RabbitProducer do
         end
       end
 
-      # def process_message(msg) do
-      #   msg
-      # end
-
-      # , process_message: 1
       defoverridable decode_payload: 1
 
       defp with_partition_by(args) do

@@ -64,7 +64,7 @@ defmodule Hutch do
       Declares a RabbitMQ queue and its associated topology (e.g., retry queues, rejected queues).
 
       This function simplifies the setup of robust messaging infrastructure. Based on the
-      provided options, it can declare:alarm_handler
+      provided options, it can declare:
         - The main process queue
         - A "rejected" queue (acting as a Dead Letter Queue) for messages that ultimately fail
         - Retry queues with message TTLs for delayed retries if `:retry` is enabled

@@ -2,7 +2,7 @@ defmodule Hutch.Publisher do
   @moduledoc """
   A GenServer for publishing messages to RabbitMQ reliably.
 
-  Ths module manages a persistent connection to RabbitMQ and provides a simple
+  This module manages a persistent connection to RabbitMQ and provides a simple
   API to publish messages. It handles connection establishment, channel opening,
   and attempts to reconnect if the connection is lost.
 

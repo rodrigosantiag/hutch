@@ -90,7 +90,7 @@ defmodule Hutch.Broadway.RabbitProducer do
       @doc """
       Starts the Broadway topology for this RabbitMQ producer.
 
-      This function is typpically called by a supervisor. It initializes the
+      This function is typically called by a supervisor. It initializes the
       RabbitMQ producer and the Broadway processing pipeline based on the
       configuration provided via `use Hutch.Broadway.RabbitProducer`.
       It also ensures that the necessary RabbitMQ queue and exchange topology

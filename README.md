@@ -156,4 +156,4 @@ Messages in the "rejected" queue have a TTL (based on `:dlq_ttl`) before being d
 
 ## License
 
-This project is licensed under the [BSD 3-Clause License](LICENSE). ---
+This project is licensed under the [BSD 3-Clause License](LICENSE).

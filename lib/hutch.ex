@@ -52,7 +52,7 @@ defmodule Hutch do
       @rabbit_url Keyword.fetch!(opts, :rabbit_url)
       @prefix Keyword.fetch!(opts, :prefix)
 
-      @doc "Returns the RabbitMQ connection URL configured for this Hutch instance.     "
+      @doc "Returns the RabbitMQ connection URL configured for this Hutch instance."
       @spec rabbit_url() :: String.t()
       def rabbit_url, do: @rabbit_url
 

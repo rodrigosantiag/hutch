@@ -25,19 +25,6 @@ defmodule Hutch do
     # end
   end
   ```
-  """
-
-  require Logger
-
-  # Defaults
-  # Default DLQ TTL 14 days
-  @hutch_default_dlq_ttl :timer.hours(24) * 14
-  @hutch_default_attempts 10
-  @hutch_default_retry_interval :timer.minutes(2)
-
-  @doc """
-  Injects Hutch configuration and queue management functions into the calling module.
-
   When you `use Hutch`, this macro defines:
     * `rabbit_url/0` - Returns the RabbitMQ connection URL.
     * `prefix/0` - Returns the configured global prefix for queues and exchanges
@@ -48,6 +35,15 @@ defmodule Hutch do
       (e.g., `"amqp://guest:guest@localhost"`)
     * `:prefix` (String.t(), required) - A global prefix for queues and exchanges, useful for namespacing.
   """
+
+  require Logger
+
+  # Defaults
+  # Default DLQ TTL 14 days
+  @hutch_default_dlq_ttl :timer.hours(24) * 14
+  @hutch_default_attempts 10
+  @hutch_default_retry_interval :timer.minutes(2)
+
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       require Logger
@@ -73,7 +69,7 @@ defmodule Hutch do
         - A "rejected" queue (acting as a Dead Letter Queue) for messages that ultimately fail
         - Retry queues with message TTLs for delayed retries if `:retry` is enabled
 
-      The nemaes of these queues and exchanges will be prefixed with the global `prefix/0`
+      The names of these queues and exchanges will be prefixed with the global `prefix/0`
       amd the provided `queue_name` (which typically corresponds to a routing key).
 
       ## Options
@@ -99,15 +95,7 @@ defmodule Hutch do
     end
   end
 
-  @doc """
-  Performs the actual declaration of a queue and its related RabbitMQ topology.
-
-  This function manages opening and closing a temporary connection and channel
-  to RabbitMQ for performing the declarations.
-
-  See `create_queue/2` for more details on the options and behavior. This function
-  is typically used internally or by `create_queue/2` macro expansion.
-  """
+  @doc false
   @spec do_create_queue(String.t(), Keyword.t()) :: :ok | {:error, any()}
   def do_create_queue(queue_name, opts) do
     with_channel(opts[:conn], fn channel ->
@@ -115,16 +103,7 @@ defmodule Hutch do
     end)
   end
 
-  @doc """
-  Declares queues and bindings on an existing AMQP channel.
-
-  This is the core implementation for setting up the RabbitMQ topology.
-  It handles the logic for creating the main queue, retry queues (if enabled),
-  and the rejected queue, along with their respective bindings.
-
-  See `create_queue/2` for option details. This function is typically called
-  internally.
-  """
+  @doc false
   @spec do_create_queue(AMQP.Channel.t(), String.t(), Keyword.t()) :: :ok | {:error, any()}
   def do_create_queue(channel, queue_name, opts) do
     config = build_config(queue_name, opts)

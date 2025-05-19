@@ -16,42 +16,11 @@ defmodule Hutch.RetryAcknowledger do
 
   require Logger
 
-  @doc """
-  Configures the acknowledger with data needed for retry logic.
-
-  This is a `Broadway.Acknowledger` callback. The `ack_data` is expected to be
-  a map containing retry configuration like `:retry_attempts`, `:queue_name`,
-  `:exchange`, `:prefix`, and `:conn` (RabbitMQ connection URL for the publisher).
-  """
   @impl true
   def configure(_original_ack_ref, ack_data, _options) do
     {:ok, ack_data}
   end
 
-  @doc """
-  Handles acknowledgment for a batch of processed messages.
-
-  This is the core logic of the `Broadway.Acknowledger` behaviour.
-
-  For each `successful` message:
-    - It extracts the original AMQP channel and delivery tag.
-    - It sends an `AMQP.Basic.ack` to RabbitMQ.
-
-  For each `failed` message:
-    - It extracts the original AMQP channel, delivery tag, and message headers.
-    - It counts the number of retry attempts using the "x-death" headers.
-    - If `attempts_count < max_retries` (from `ack_ref` which is the `retry_config`):
-      - It rejects the message using `AMQP.Basic.reject(channel, delivery_tag, requeue: false)`.
-        This relies on the source queue being configured with a dead-letter exchange
-        pointing to a retry queue.
-    - If `attempts_count >= max_retries`:
-      - It logs that the message is being sent to the rejected queue.
-      - It constructs the name of the rejected queue (e.g., `prefix.queue_name.rejected`).
-      - It ensures the `Hutch.Publisher` is started.
-      - It publishes the failed message's data (as JSON) to the rejected queue using `Hutch.Publisher.publish/4`.
-      - It then ACKs the original message (`AMQP.Basic.ack`) to remove it from the processing queue.
-        This is crucial because the message has now been successfully "handled" by moving it to the rejected queue.
-  """
   @impl true
   def ack(ack_ref, successful, failed) do
     Logger.info("Acknowledging ack_ref: #{inspect(ack_ref)}")

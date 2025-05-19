@@ -31,27 +31,11 @@ defmodule Hutch.Publisher do
 
   # Server API
 
-  @doc """
-  Starts the `Hutch.Publisher` GenServer.
-
-  This is typically called by a supervisor.
-
-  ## Options
-
-    * `:rabbit_url` (String.t(), required) - The RabbitMQ connection URL.
-      (e.g., `"amqp://guest:guest@localhost"`)
-  """
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @doc """
-  Initializes the `Hutch.Publisher` GenServer.
-
-  Sets up the initial state with the RabbitMQ connection URL and triggers connection.
-
-  This is an internal GenServer callback.
-  """
+  @doc false
   @impl true
   def init(opts) do
     rabbit_url = Keyword.fetch!(opts, :rabbit_url)
@@ -63,23 +47,13 @@ defmodule Hutch.Publisher do
     end
   end
 
-  @doc """
-  Handles the deferred connection attempt after init.
-
-  This is an internal GenServer callback.
-  """
+  @doc false
   @impl true
   def handle_continue(:connect, state) do
     connect_and_update_state(state)
   end
 
-  @doc """
-  Handles publish requests.
-
-  Publishes the message using `AMQP.Basic.publish/5`.
-
-  This is an internal GenServer callback.
-  """
+  @doc false
   @impl true
   def handle_call(
         {:publish, _exchange, _routing_key, _payload, _options},
@@ -99,24 +73,13 @@ end
     {:reply, result, state}
   end
 
-  @doc """
-  Handles explicit connection requests or scheduled connections.
-
-  This is an internal GenServer callback.
-  """
+  @doc false
   @impl true
   def handle_info(:connect, state) do
     connect_and_update_state(state)
   end
 
-  @doc """
-  Handles connection loss notifications.
-
-  When the RabbitMQ connection is lost, this callback is triggered.
-  It attempts to close the channel and schedules a reconnection after a delay.
-
-  This is an internal GenServer callback.
-  """
+  @doc false
   @impl true
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{ref: ref} = state) do
     Logger.error("Connection to RabbitMQ lost: #{inspect(reason)}")
@@ -132,11 +95,7 @@ end
     {:noreply, state}
   end
 
-  @doc """
-  Cleans up resources when the GenServer is terminated.
-
-  This is an internal GenServer callback.
-  """
+  @doc false
   @impl true
   def terminate(_reason, state) do
     safely_close_channel(state.channel)

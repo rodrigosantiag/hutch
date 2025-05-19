@@ -32,17 +32,6 @@ defmodule Hutch.Broadway.RabbitProducer do
     # end
   end
   ```
-  """
-  alias Broadway.Message
-
-  require Logger
-
-  @doc """
-  Set up the Broadway producer with specific configurations for RabbitMQ.
-
-  When you `use Hutch.Broadway.RabbitProducer` in your module, this macro
-  initializes necessary attributes and functions for consuming messages from
-  a RabbitMQ queue using Broadway.
 
   ## Options
 
@@ -71,6 +60,10 @@ defmodule Hutch.Broadway.RabbitProducer do
     * `:partitioned_by` (atom() | {module, function, args}, optional) - Broadway partitioning configuration.
       If provided, messages will be partitioned accordingly.
   """
+  alias Broadway.Message
+
+  require Logger
+
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       require Logger

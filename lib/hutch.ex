@@ -70,7 +70,7 @@ defmodule Hutch do
         - Retry queues with message TTLs for delayed retries if `:retry` is enabled
 
       The names of these queues and exchanges will be prefixed with the global `prefix/0`
-      amd the provided `queue_name` (which typically corresponds to a routing key).
+      and the provided `queue_name` (which typically corresponds to a routing key).
 
       ## Options
         * `:exchange` (String.t(), required) - The RabbitMQ exchange to bind the queue to.

@@ -1,4 +1,17 @@
 defmodule Hutch.RetryAcknowledger do
+  @moduledoc """
+  A `Broadway.Acknowledger` for implementing message retry and dead-lettering logic.
+
+  This acknowledger is used by `Hutch.Broadway.RabbitProducer` when the `:retry`
+  option is enabled. It handles the acknowledgment of messages processed by
+  Broadway, deciding whether to:
+  1. Simply ACK successful messages.
+  2. Reject failed messages and requeue them if they haven't exceeded the retry limit.
+  3. Send failed messages to a rejected queue if they have exceeded the retry limit.
+
+  It relies on message headers (specifically the `x-death` header) to count retry attempts
+  and configuration passed during its setup (max retry attempts, queue names, etc.).
+  """
   @behaviour Broadway.Acknowledger
 
   require Logger

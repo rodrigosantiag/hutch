@@ -1,6 +1,28 @@
 defmodule Hutch.Publisher do
   @moduledoc """
-  A module that provides a simple interface for publishing messages to RabbitMQ.
+  A GenServer for publishing messages to RabbitMQ reliably.
+
+  This module manages a persistent connection to RabbitMQ and provides a simple
+  API to publish messages. It handles connection establishment, channel opening,
+  and attempts to reconnect if the connection is lost.
+
+  ## Example Usage
+
+  # To start the publisher (e.g., in your `application.ex`):
+  ```elixir
+  children = [
+    {Hutch.Publisher, rabbit_url: "amqp://guest:guest@localhost"}
+    # Other children...
+  ]
+  Supervisor.start_link(children, strategy: :one_for_one)
+  ```
+
+  # To publish a message:
+  ```elixir
+  Hutch.Publisher.publish("my_exchange", "my_routing_key", "Hello, RabbitMQ!")
+  # With options
+  Hutch.Publisher.publish("my_exchange", "my_routing_key", "Hello, RabbitMQ!", persistent: true, content_type: "application/json")
+  ```
   """
 
   use GenServer
@@ -13,6 +35,7 @@ defmodule Hutch.Publisher do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
+  @doc false
   @impl true
   def init(opts) do
     rabbit_url = Keyword.fetch!(opts, :rabbit_url)
@@ -24,11 +47,13 @@ defmodule Hutch.Publisher do
     end
   end
 
+  @doc false
   @impl true
   def handle_continue(:connect, state) do
     connect_and_update_state(state)
   end
 
+  @doc false
   @impl true
   def handle_call(
         {:publish, _exchange, _routing_key, _payload, _options},
@@ -36,7 +61,7 @@ defmodule Hutch.Publisher do
         %{channel: nil} = state
       ) do
     {:reply, {:error, :not_connected}, state}
-  end
+end
 
   @impl true
   def handle_call(
@@ -48,11 +73,13 @@ defmodule Hutch.Publisher do
     {:reply, result, state}
   end
 
+  @doc false
   @impl true
   def handle_info(:connect, state) do
     connect_and_update_state(state)
   end
 
+  @doc false
   @impl true
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{ref: ref} = state) do
     Logger.error("Connection to RabbitMQ lost: #{inspect(reason)}")
@@ -61,13 +88,14 @@ defmodule Hutch.Publisher do
 
     Process.send_after(self(), :connect, 5000)
     {:noreply, %{state | conn: nil, channel: nil, ref: nil}}
-  end
+end
 
   @impl true
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
     {:noreply, state}
   end
 
+  @doc false
   @impl true
   def terminate(_reason, state) do
     safely_close_channel(state.channel)
@@ -76,6 +104,30 @@ defmodule Hutch.Publisher do
   end
 
   # Public API
+
+  @doc """
+  Publishes a message to the specified RabbitMQ exchange with the given routing key and payload.
+
+  This is a primary public interface for sending messages. It's a synchronous
+  call to the `Hutch.Publisher` GenServer.
+
+  ## Parameters
+
+    * `exchange` (String.t()) - The name of the exchange to publish to.
+    * `routing_key` (String.t()) - The routing key for the message.
+    * `payload` (String.t() | binary()) - The message payload.
+    * `options` (Keyword.t(), optional) - Options for `AMQP.Basic.publish/5`.
+      Common options include:
+        - `persistent` (boolean()): Marks message as persistent.
+        - `content_type` (String.t()): The MIME type of the message content (e.g., "application/json").
+        - `headers`: Additional headers for the message.
+
+  ## Returns
+
+    * `:ok` if the message was successfully published.
+    * `{:error, :not_connected}` if the publisher is not connected to RabbitMQ.
+    * Other error tuples from `AMQP.Basic.publish/5` if the publish fails.
+  """
   def publish(exchange, routing_key, payload, options \\ []) do
     GenServer.call(__MODULE__, {:publish, exchange, routing_key, payload, options})
   end

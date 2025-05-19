@@ -1,4 +1,65 @@
 defmodule Hutch.Broadway.RabbitProducer do
+  @moduledoc """
+  Provides a reusable Broadway producer setup for consuming messages from RabbitMQ.
+
+  This module is intended to be `use`d within your own Broadway modules.
+  It configures a `BroadwayRabbitMQ.Producer` and integrates with Hutch's
+  queue management and retry mechanisms. It handles message deserialization
+  (defaulting to JSON) and injects a custom acknowledger for retry logic
+  when enabled.
+
+  ## Example Usage
+
+  ```elixir
+  defmodule MyApp.MyConsumer do
+    use Hutch.Broadway.RabbitProducer,
+      queue_manager: MyApp.QueueManager,
+      exchange: "my_exchange",
+      routing_key: "my_routing_key",
+      retry: true,
+      # other Broadway options...
+
+    @impl true
+    def handle_message(_processor, message, _context) do
+      # Process your message
+      {:ok, message}
+    end
+
+    # Optionally, you can override the `decode_payload/1` function
+    # def decode_payload(message) do
+    #   # Custom decoding logic if needed
+    #   message
+    # end
+  end
+  ```
+
+  ## Options
+
+  This macro accepts several options, many of which are passed to Broadway
+  or `BroadwayRabbitMQ.Producer`:
+
+    * `:queue_manager` (atom(), required) - The module that manages queue configurations
+      and provides `rabbit_url/0` and `prefix/0` functions (typically your `Hutch` module).
+    * `:exchange` (String.t(), required) - The RabbitMQ exchange to consume from.
+    * `:routing_key` (String.t(), required) - The routing key for the queue binding.
+    * `:name` (atom(), optional) - The name of the Broadway module (defaults to the module name).
+    * `:batchers` (Keyword.t(), optional) - List of batchers to use in Broadway. Defaults to `[]`
+    * `:durable` (boolean(), optional) - Whether the queue should be durable (defaults to `true`).
+    * `:dlq_ttl` (integer(), optional) - Time-to-live for dead-lettered messages,
+      used by the `:queue_manager` when creating the queue.
+    * `:prefetch_count` (integer(), optional) - RabbitMQ prefetch count (Qos). Defaults to `20`.
+    * `:prefix` (String.t(), optional) - Prefix for the queue name, used to avoid conflicts
+      with other queues (defaults to the prefix from the `:queue_manager`).
+    * `:processors` (Keyword.t(), optional) - List of processors to use in Broadway (defaults to `[]`).
+    * `:retry` (boolean(), optional) - Whether to enable retry logic (defaults to `false`).
+    * `:retry_attempts` (integer(), optional) - Number of retry attempts before sending to DLQ. Used by
+      the `:queue_manager` and `Hutch.RetryAcknowledger`.
+    * `:retry_interval` (integer(), optional) - Interval between retries in milliseconds (defaults to 2 minutes).
+      Used by the `:queue_manager`.
+    * `:worker_count` (integer(), optional) - Number of concurrent producer workers. Defaults to `2`.
+    * `:partitioned_by` (atom() | {module, function, args}, optional) - Broadway partitioning configuration.
+      If provided, messages will be partitioned accordingly.
+  """
   alias Broadway.Message
 
   require Logger
@@ -26,6 +87,15 @@ defmodule Hutch.Broadway.RabbitProducer do
 
       use Broadway
 
+      @doc """
+      Starts the Broadway topology for this RabbitMQ producer.
+
+      This function is typically called by a supervisor. It initializes the
+      RabbitMQ producer and the Broadway processing pipeline based on the
+      configuration provided via `use Hutch.Broadway.RabbitProducer`.
+      It also ensures that the necessary RabbitMQ queue and exchange topology
+      are created via the configured `@queue_manager`.
+      """
       @spec start_link(term()) :: Supervisor.on_start()
       def start_link(_opts) do
         producer = [
@@ -65,6 +135,15 @@ defmodule Hutch.Broadway.RabbitProducer do
       end
 
       if @retry do
+        @doc """
+        Prepares messages before they are processed by `handle_message/3`.
+
+        When retry is enabled, this function injects the `Hutch.RetryAcknowledger`
+        into each message. This custom acknowledger handles retry logic
+        and ensures messages are requeued or sent to a dead-letter queue after too many failures.
+
+        This callback is part of the Broadway behaviour.
+        """
         @impl true
         def prepare_messages(messages, context) do
           Logger.info("Context for retry: #{inspect(context)}")
@@ -95,6 +174,32 @@ defmodule Hutch.Broadway.RabbitProducer do
         }
       end
 
+      @doc """
+      Decodes the payload of an incoming RabbitMQ message.
+
+      By default, this function attempts to decode the `msg.data` field as JSON.
+      If decoding is successful, the `data` field is updated with the parsed JSON.
+      If decoding fails, the message is marked as failed.
+
+      This function is overridable. You can define your own `decode_payload/1`
+      in your consumer module if you need custom decoding logic.
+
+      ## Example of overriding
+
+      ```elixir
+      defmodule MyApp.MyConsumer do
+        use Hutch.Broadway.RabbitProducer, # other options...
+
+        # ...
+
+        @impl Hutch.Broadway.RabbitProducer
+        def decode_payload(msg) do
+          # Custom decoding logic here
+          msg
+        end
+      end
+      ```
+      """
       @spec decode_payload(Message.t()) :: Message.t()
       def decode_payload(msg) do
         case Jason.decode(msg.data) do

@@ -7,7 +7,12 @@ defmodule Hutch.MixProject do
       version: "0.1.0",
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      docs: [
+        main: "Hutch",
+        source_url: "https://github.com/hammeraj/hutch",
+        extras: ["README.md"]
+      ]
     ]
   end
 
@@ -25,6 +30,7 @@ defmodule Hutch.MixProject do
       {:broadway, "~> 1.0"},
       {:broadway_rabbitmq, "~> 0.6"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.38.1", only: :dev, runtime: false},
       {:jason, "~> 1.4"},
       {:mimic, "~> 1.0", only: :test}
       # {:dep_from_hexpm, "~> 0.3.0"},

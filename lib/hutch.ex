@@ -133,8 +133,7 @@ defmodule Hutch do
       bind_queues(channel, bindings)
     end
 
-    _rejected_queue =
-      declare_rejected_queue(channel, config.rejected_queue, config.dlq_ttl, config.durable)
+    declare_rejected_queue(channel, config.rejected_queue, config.dlq_ttl, config.durable)
 
     :ok
   end

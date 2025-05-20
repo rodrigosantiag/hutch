@@ -87,9 +87,7 @@ defmodule MyApp.UserEventConsumer do
   def handle_message(_, %Message{data: event_data} = message, _) do
     IO.inspect(event_data, label: "Processing user event")
     # Your processing logic here...
-    # Return {:ok, message} on success.
-    # Return {:error, reason, message} or raise an error to trigger Hutch's retry/DLQ mechanism.
-    {:ok, message}
+    message
   end
 
   # Optional: Override if your messages are not JSON or need custom decoding

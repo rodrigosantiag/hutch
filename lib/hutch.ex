@@ -134,6 +134,8 @@ defmodule Hutch do
     end
 
     declare_rejected_queue(channel, config.rejected_queue, config.dlq_ttl, config.durable)
+
+    :ok
   end
 
   defp declare_retry_queues(channel, config) do

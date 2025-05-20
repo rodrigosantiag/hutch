@@ -61,7 +61,7 @@ defmodule Hutch.Publisher do
         %{channel: nil} = state
       ) do
     {:reply, {:error, :not_connected}, state}
-end
+  end
 
   @impl true
   def handle_call(
@@ -88,7 +88,7 @@ end
 
     Process.send_after(self(), :connect, 5000)
     {:noreply, %{state | conn: nil, channel: nil, ref: nil}}
-end
+  end
 
   @impl true
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do

@@ -146,12 +146,8 @@ defmodule Hutch.Broadway.RabbitProducer do
         """
         @impl true
         def prepare_messages(messages, context) do
-          Logger.info("Context for retry: #{inspect(context)}")
-
           messages
           |> Enum.map(fn msg ->
-            Logger.info("Message for retry: #{inspect(msg)}")
-
             msg
             |> inject_acknowledger()
           end)

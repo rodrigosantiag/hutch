@@ -1,29 +1,106 @@
-defmodule HutchTest do
-  use ExUnit.Case, async: true
+defmodule Hutch.HutchTest do
+  @moduledoc false
+
+  use ExUnit.Case, async: false
   import Mimic
 
-  setup :verify_on_exit!
+  alias Hutch
 
-  test "creates queue with retry: false" do
-    expect(AMQP.Connection, :open, fn "amqp://localhost" -> {:ok, :conn} end)
-    expect(AMQP.Channel, :open, fn :conn -> {:ok, :chan} end)
-    expect(AMQP.Connection, :close, fn :conn -> :ok end)
+  setup :set_mimic_global
 
-    expect(AMQP.Queue, :declare, 2, fn :chan, _queue, _opts -> {:ok, %{}} end)
-    expect(AMQP.Exchange, :declare, 2, fn :chan, _exchange, :topic -> :ok end)
+  describe "do_create_queue/2" do
+    setup do
+      conn = %{}
+      channel = %{}
 
-    expect(AMQP.Queue, :bind, 2, fn :chan, _queue, _exchange, opts ->
-      assert Keyword.has_key?(opts, :routing_key)
-      :ok
-    end)
+      expect(AMQP.Connection, :open, fn ^conn -> {:ok, conn} end)
+      expect(AMQP.Channel, :open, fn ^conn -> {:ok, channel} end)
+      expect(AMQP.Connection, :close, fn ^conn -> :ok end)
 
-    opts = [
-      rabbit_url: "amqp://localhost",
-      exchange: "myapp",
-      prefix: "dev",
-      retry: false
-    ]
+      {:ok, conn: conn, channel: channel}
+    end
 
-    assert :ok = Hutch.create_queue("myqueue", opts)
+    test "creates a queue without retry", %{conn: conn, channel: channel} do
+      opts = [
+        conn: conn,
+        exchange: "ex",
+        retry: false,
+        durable: true,
+        prefix: "prefix"
+      ]
+
+      expect(AMQP.Queue, :declare, fn ^channel, "prefix.queue_name", opts ->
+        assert Keyword.get(opts, :durable) == true
+        assert {"x-dead-letter-exchange", :longstr, ""} in opts[:arguments]
+        {:ok, :queue}
+      end)
+
+      expect(AMQP.Queue, :declare, fn ^channel, "prefix.queue_name.rejected", opts ->
+        assert Keyword.get(opts, :durable) == true
+
+        assert {"x-message-ttl", :signedint, _} =
+                 List.keyfind(opts[:arguments], "x-message-ttl", 0)
+
+        {:ok, :rejected_queue}
+      end)
+
+      expect(AMQP.Exchange, :declare, fn ^channel, "ex", :topic -> :ok end)
+
+      expect(AMQP.Queue, :bind, fn ^channel,
+                                   "prefix.queue_name",
+                                   "ex",
+                                   routing_key: "queue_name" ->
+        :ok
+      end)
+
+      result = Hutch.do_create_queue(channel, "queue_name", opts)
+      assert result == :ok
+    end
+
+    test "creates retry queues when retry option enabled", %{conn: conn, channel: channel} do
+      opts = [
+        conn: conn,
+        exchange: "ex",
+        retry: true,
+        durable: true,
+        prefix: "prefix"
+      ]
+
+      expect(AMQP.Queue, :declare, fn ^channel, "prefix.queue_name", opts ->
+        assert {"x-queue-type", :longstr, "quorum"} in opts[:arguments]
+        {:ok, :quorum_queue}
+      end)
+
+      expect(AMQP.Queue, :declare, fn ^channel, "prefix.queue_name.retry", opts ->
+        assert {"x-message-ttl", :signedint, _} =
+                 List.keyfind(opts[:arguments], "x-message-ttl", 0)
+
+        {:ok, :retry_queue}
+      end)
+
+      expect(AMQP.Queue, :declare, fn ^channel, "prefix.queue_name.rejected", _opts ->
+        {:ok, :rejected_queue}
+      end)
+
+      expect(AMQP.Exchange, :declare, fn ^channel, "ex", :topic -> :ok end)
+      expect(AMQP.Exchange, :declare, fn ^channel, "ex", :topic -> :ok end)
+
+      expect(AMQP.Queue, :bind, fn ^channel,
+                                   "prefix.queue_name",
+                                   "ex",
+                                   routing_key: "queue_name" ->
+        :ok
+      end)
+
+      expect(AMQP.Queue, :bind, fn ^channel,
+                                   "prefix.queue_name.retry",
+                                   "ex",
+                                   routing_key: "queue_name.retry" ->
+        :ok
+      end)
+
+      result = Hutch.do_create_queue(channel, "queue_name", opts)
+      assert result == :ok
+    end
   end
 end

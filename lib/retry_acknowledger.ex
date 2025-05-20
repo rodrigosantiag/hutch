@@ -23,8 +23,6 @@ defmodule Hutch.RetryAcknowledger do
 
   @impl true
   def ack(ack_ref, successful, failed) do
-    Logger.info("Acknowledging ack_ref: #{inspect(ack_ref)}")
-
     Enum.each(failed, fn message ->
       {_, _, original_ack_data} = message.acknowledger
 
@@ -40,21 +38,14 @@ defmodule Hutch.RetryAcknowledger do
       attempts_count = count_retries_from_headers(headers)
 
       if attempts_count < max_retries do
-        Logger.info("Message failed, requeueing: #{inspect(message.data)}")
-
         AMQP.Basic.reject(
           channel,
           delivery_tag,
           requeue: false
         )
       else
-        Logger.info("Message failed, sending to rejected queue: #{inspect(message.data)}")
-
         rejected_queue =
           ack_ref.prefix <> "." <> ack_ref.queue_name <> ".rejected"
-
-        Logger.info("Rejected queue: #{inspect(rejected_queue)}")
-        Logger.info("Message ack_ref: #{inspect(ack_ref)}")
 
         ensure_publisher_started(ack_ref.conn)
 
@@ -69,7 +60,7 @@ defmodule Hutch.RetryAcknowledger do
                headers: message.metadata[:headers]
              ) do
           :ok ->
-            Logger.info("Message sent to rejected queue successfully")
+            :ok
 
           {:error, reason} ->
             Logger.error("Failed to send message to rejected queue: #{inspect(reason)}")
